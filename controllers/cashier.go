@@ -27,18 +27,37 @@ type CashierResponse struct {
 	Name      string `json:"name"`
 }
 
+func (b *Cashier) Mount(group fiber.Router) {
+	group.Post("", b.CreateCashier)
+	group.Get("", b.GetAllCashier)
+	group.Get("/:id", b.GetCashier)
+	group.Put("/:id", b.UpdateCashier)
+	group.Delete("/:id", b.DeleteCashier)
+
+	group.Get("/:id/passcode", b.Passcode)
+	group.Post("/:id/login", b.Login)
+}
+
 func (b *Cashier) GetAllCashier(c *fiber.Ctx) error {
-
-	var cashiers []models.Cashiers = models.FindAllCashier(c)
-
-	cashiersResponses := make([]CashierResponse, len(cashiers))
 	count := models.GetCashierCount()
+	if count == 0 {
+		for i := 1; i <= 10; i++ {
+			data := new(models.Cashiers)
+			data.Name = "kasir " + strconv.Itoa(i)
+			models.CreateCashier(*data)
+		}
+	}
 
+	count = models.GetCashierCount()
+	var cashiers []models.Cashiers = models.FindAllCashier(c)
+	cashiersResponses := make([]CashierResponse, len(cashiers))
 	for i, element := range cashiers {
 		cashiersResponses[i].CashierId = element.CashierId
 		cashiersResponses[i].Name = element.Name
 	}
 
+	limit, _ := strconv.Atoi(c.Query("limit"))
+	skip, _ := strconv.Atoi(c.Query("skip"))
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"success": true,
 		"message": "Success",
@@ -46,8 +65,8 @@ func (b *Cashier) GetAllCashier(c *fiber.Ctx) error {
 			"cashiers": cashiersResponses,
 			"meta": fiber.Map{
 				"total": count,
-				"limit": c.Query("limit"),
-				"skip":  c.Query("skip"),
+				"limit": limit,
+				"skip":  skip,
 			},
 		},
 	})
@@ -75,7 +94,7 @@ func (b *Cashier) GetCashier(c *fiber.Ctx) error {
 func (b *Cashier) Passcode(c *fiber.Ctx) error {
 	id, _ := strconv.Atoi(c.Params("id"))
 
-	passcode, err := models.Passcode(id)
+	passCode, err := models.Passcode(id)
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{
 			"success": false,
@@ -88,7 +107,7 @@ func (b *Cashier) Passcode(c *fiber.Ctx) error {
 		"success": true,
 		"message": "Success",
 		"data": fiber.Map{
-			"passcode": passcode,
+			"passcode": passCode,
 		},
 	})
 }
@@ -107,15 +126,15 @@ func (b *Cashier) Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"success": false, "message": "body validationError: \"passcode\" is required"})
 	}
 
-	passcode, err := models.Passcode(id)
+	passCode, err := models.Passcode(id)
 	if err != nil {
-		return c.Status(404).JSON(fiber.Map{
+		return c.Status(401).JSON(fiber.Map{
 			"success": false,
 			"message": "Cashier Not Found",
 		})
 	}
 
-	if passcode == p.Passcode {
+	if passCode == p.Passcode {
 		//		secretKey := config.Config("SECRET_KEY")
 		secretKey := "goPos"
 		claims := jwt.MapClaims{
@@ -126,7 +145,10 @@ func (b *Cashier) Login(c *fiber.Ctx) error {
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 		tokenString, err := token.SignedString([]byte(secretKey))
 		if err != nil {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"success": false, "message": "JWT Token Error"})
+			return c.Status(401).JSON(fiber.Map{
+				"success": false,
+				"message": "JWT Token Error",
+			})
 		}
 
 		return c.Status(200).JSON(fiber.Map{

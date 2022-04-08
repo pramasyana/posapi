@@ -12,10 +12,17 @@ type Category struct {
 	Base
 }
 
-func (b *Category) GetAllCategory(c *fiber.Ctx) error {
-	var categories []models.Categories = models.FindAllCategory(c)
-	count := models.GetCategoryCount()
+func (b *Category) Mount(group fiber.Router) {
+	group.Get("", b.GetAllCategory)
+	group.Get("/:id", b.GetCategory)
+	group.Post("", b.CreateCategory)
+	group.Delete("/:id", b.DeleteCategory)
+	group.Put("/:id", b.UpdateCategory)
+}
 
+func (b *Category) GetAllCategory(c *fiber.Ctx) error {
+	count := models.GetCategoryCount()
+	var categories []models.Categories = models.FindAllCategory(c)
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"success": true,
 		"message": "Success",
@@ -32,7 +39,6 @@ func (b *Category) GetAllCategory(c *fiber.Ctx) error {
 
 func (b *Category) GetCategory(c *fiber.Ctx) error {
 	id, _ := strconv.Atoi(c.Params("id"))
-
 	category, err := models.FindCategory(id)
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{

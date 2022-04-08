@@ -1,34 +1,46 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jinzhu/gorm"
+	"gorm.io/datatypes"
 )
 
 type Products struct {
 	gorm.Model
-	ProductId  int64   `gorm:"Not Null" json:"productid"`
-	Name       string  `json:"name"`
-	Stock      int64   `json:"stock"`
-	Price      float64 `json:"price"`
-	Image      string  `json:"image"`
-	Sku        string  `json:"SKU"`
-	CategoryId int64   `json:"categoryId"`
-	DiscountId int64   `json:"discount"`
+	ProductId  int64          `gorm:"Not Null" json:"productid"`
+	Name       string         `json:"name"`
+	Stock      int64          `json:"stock"`
+	Price      float64        `json:"price"`
+	Image      string         `json:"image"`
+	Sku        string         `json:"SKU"`
+	CategoryId int64          `json:"categoryId"`
+	Discount   datatypes.JSON `json:"discount"`
+}
+
+type ProductsParsing struct {
+	Name       string      `json:"name"`
+	Stock      int64       `json:"stock"`
+	Price      interface{} `json:"price"`
+	Image      string      `json:"image"`
+	Sku        string      `json:"SKU"`
+	CategoryId int64       `json:"categoryId"`
+	Discount   interface{} `json:"discount"`
 }
 
 type ProductList struct {
-	ProductId  int64        `json:"productId"`
-	Sku        string       `json:"sku"`
-	Name       string       `json:"name"`
-	Stock      int64        `json:"stock"`
-	Price      float64      `json:"price"`
-	Image      string       `json:"image"`
-	Category   CategoryList `json:"category"`
-	DiscountId int64        `json:"discount"`
+	ProductId int64        `json:"productId"`
+	Sku       string       `json:"sku"`
+	Name      string       `json:"name"`
+	Stock     int64        `json:"stock"`
+	Price     float64      `json:"price"`
+	Image     string       `json:"image"`
+	Category  CategoryList `json:"category"`
+	Discount  interface{}  `json:"discount"`
 }
 
 func FindAllProduct(c *fiber.Ctx) []ProductList {
@@ -36,7 +48,7 @@ func FindAllProduct(c *fiber.Ctx) []ProductList {
 	var product ProductList
 
 	db := GetDB().Table("products").Select(
-		"products.product_id, products.sku, products.name, products.stock, products.price, products.image, products.category_id, categories.name as category_name")
+		"products.product_id, products.sku, products.name, products.stock, products.price, products.image, products.discount, products.category_id, categories.name as category_name")
 	db = db.Where("products.deleted_at is NULL")
 
 	if len(c.Query("limit")) > 0 {
@@ -59,6 +71,9 @@ func FindAllProduct(c *fiber.Ctx) []ProductList {
 	defer rows.Close()
 
 	for rows.Next() {
+		var (
+			discount *json.RawMessage
+		)
 		rows.Scan(
 			&product.ProductId,
 			&product.Sku,
@@ -66,9 +81,15 @@ func FindAllProduct(c *fiber.Ctx) []ProductList {
 			&product.Stock,
 			&product.Price,
 			&product.Image,
+			&discount,
 			&product.Category.CategoryId,
 			&product.Category.Name,
 		)
+
+		if discount != nil {
+			json.Unmarshal([]byte(*discount), &product.Discount)
+		}
+
 		products = append(products, product)
 	}
 

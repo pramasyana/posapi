@@ -16,10 +16,19 @@ type Payments struct {
 	Card      string `gorm:"Not Null" json:"card"`
 }
 
+type PaymentsList struct {
+	PaymentId int64  `json:"paymentId"`
+	Name      string `json:"name"`
+	Type      string `json:"type"`
+	Logo      string `json:"logo"`
+	Card      []int  `json:"card"`
+}
+
 func FindAllPayment(c *fiber.Ctx) []Payments {
 	var payments []Payments
 
 	db := GetDB()
+
 	if len(c.Query("limit")) > 0 {
 		db = db.Limit(c.Query("limit"))
 	}
@@ -50,4 +59,25 @@ func FindPayment(id int) (Payments, error) {
 	}
 
 	return payment, err
+}
+
+func CreatePayment(payments Payments) (Payments, error) {
+	// Get Max cashierId
+	var maxCashier Payments
+
+	GetDB().Raw(`
+		SELECT COALESCE(MAX(payment_id) + 1, 1) as payment_id
+		FROM payments
+		`).Scan(
+		&maxCashier,
+	)
+
+	payments.PaymentId = maxCashier.PaymentId
+
+	err := GetDB().Create(&payments).Error
+	if err != nil {
+		return payments, err
+	}
+
+	return payments, nil
 }

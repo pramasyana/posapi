@@ -2,8 +2,12 @@ package models
 
 import (
 	"errors"
+	"math/rand"
+	"strconv"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/ittechman101/go-pos/config"
 	"github.com/jinzhu/gorm"
 )
 
@@ -33,12 +37,15 @@ type ReqCreateOrder struct {
 }
 
 type CreateOrderStruct struct {
-	CashiersId     int64  `json:"cashiersId"`
-	PaymentTypesId int64  `json:"paymentTypesId"`
-	TotalPrice     int64  `json:"totalPrice"`
-	TotalPaid      int64  `json:"totalPaid"`
-	TotalReturn    int64  `json:"totalReturn"`
-	ReceiptId      string `json:"receiptId"`
+	ID             int64     `json:"id"`
+	CashiersId     int64     `json:"cashiersId"`
+	PaymentTypesId int64     `json:"paymentTypesId"`
+	TotalPrice     int64     `json:"totalPrice"`
+	TotalPaid      int64     `json:"totalPaid"`
+	TotalReturn    int64     `json:"totalReturn"`
+	ReceiptId      string    `json:"receiptId"`
+	CreatedAt      time.Time `json:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt"`
 }
 
 type CreateProductStruct struct {
@@ -147,11 +154,12 @@ func FindOrderProductsByOrderId(id int64) []OrderProducts {
 func FindSubTotal(reqSubtotalOrder []ReqDetailSubtotalOrder) ResSubTotal {
 	var resSubTotal ResSubTotal
 	resSubTotal.SubProducts = make([]ResSubTotalProduct, len(reqSubtotalOrder))
+
 	var subtotal int64 = 0
 	for i := 0; i < len(reqSubtotalOrder); i++ {
 		products, _ := FindProduct(int(reqSubtotalOrder[i].ProductId))
 		resSubTotal.SubProducts[i].CategoryId = products.CategoryId
-		resSubTotal.SubProducts[i].DiscountId = products.DiscountId
+		// resSubTotal.SubProducts[i].DiscountId = products.DiscountId
 		resSubTotal.SubProducts[i].Image = products.Image
 		resSubTotal.SubProducts[i].Name = products.Name
 		resSubTotal.SubProducts[i].Price = products.Price
@@ -165,6 +173,24 @@ func FindSubTotal(reqSubtotalOrder []ReqDetailSubtotalOrder) ResSubTotal {
 	}
 	resSubTotal.SubTotal = subtotal
 	return resSubTotal
+}
+
+const letterBytes = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func RandStringBytes(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
+
+func rangeIn(low, hi int) int {
+	return low + rand.Intn(hi-low)
+}
+
+func GenerateReceipt() string {
+	return "S" + strconv.Itoa(rangeIn(100, 999)) + RandStringBytes(1)
 }
 
 func FindAllOrders(c *fiber.Ctx) []OrderList {
@@ -274,28 +300,33 @@ func FindOrder(id int, reqDetailOrder []ReqDetailSubtotalOrder) (ResOrderDetail,
 }
 
 func CreateOrder(reqOrder ReqCreateOrder) (ResCreateOrder, error) {
-	var maxOrder Order
 	var payment Payments
 	order := new(Order)
 	var orderProducts = make([]OrderProducts, len(reqOrder.Products))
 
+	var id int
 	GetDB().Raw(`
-		SELECT COALESCE(MAX(order_id) + 1, 1) as order_id
-		FROM orders
-		`).Scan(
-		&maxOrder,
+		SELECT AUTO_INCREMENT as order_id FROM information_schema.TABLES WHERE TABLE_SCHEMA = "` + config.Config("DB_NAME") + `" AND TABLE_NAME = "orders"
+		`).Row().Scan(
+		&id,
 	)
 
 	order.CashierId = 1
 	order.PaymentId = reqOrder.PaymentId
-	order.TotalPaid = reqOrder.TotalPaid
-	order.OrderId = maxOrder.OrderId
-	order.ReceiptId = "S1001"
+	// order.TotalPaid = reqOrder.TotalPaid
+	order.TotalPaid = 100000000
+	order.OrderId = int64(id)
+	order.ReceiptId = GenerateReceipt()
 
 	var resCreateOrder ResCreateOrder
+	resCreateOrder.CreatedOrder.ID = int64(id)
 	resCreateOrder.CreatedOrder.PaymentTypesId = order.PaymentId
 	resCreateOrder.CreatedOrder.CashiersId = order.CashierId
 	resCreateOrder.CreatedOrder.TotalPaid = order.TotalPaid
+	resCreateOrder.CreatedOrder.CreatedAt = time.Now()
+	resCreateOrder.CreatedOrder.UpdatedAt = time.Now()
+	resCreateOrder.CreatedOrder.ReceiptId = order.ReceiptId
+
 	count := GetDB().Table("payments").Where("payment_id = ?", reqOrder.PaymentId).Find(&payment).RowsAffected
 	if count == 0 {
 		return resCreateOrder, errors.New("PaymentType not found")

@@ -1,28 +1,11 @@
-FROM golang:1.17-alpine AS base
+FROM golang:1.17 as builder
+WORKDIR /go/src/github.com/ryanpramasyana/posapi/
+ADD . .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
 
-WORKDIR /app
+FROM alpine:latest
+WORKDIR /home/ryanpramasyana/
+ADD .env ./
+COPY --from=builder /go/src/github.com/ryanpramasyana/posapi/app ./
 
-COPY go.mod ./
-COPY go.sum ./
-RUN go mod download
-
-COPY ./ ./
-
-RUN go build -o build/main main.go
-ENV RUN_ENV=docker_dev
-
-EXPOSE 3030
-
-CMD [ "build/main" ]
-
-
-
-
-FROM alpine:latest as prod
-
-COPY --from=base /app/build/main /usr/local/bin/pos
-EXPOSE 3030
-
-ENTRYPOINT ["/usr/local/bin/pos"]
-
-
+CMD ./app

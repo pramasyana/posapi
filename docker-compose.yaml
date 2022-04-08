@@ -2,9 +2,9 @@
 version: "3.7"
 
 services:
-  posapp-be-test:
-    container_name: posapp-be-test
-    image: jetdev7/posapp-be-test
+  posapi:
+    container_name: posapi
+    image: ryanpramasyana/posapi
     build: .
     ports:
       - "8090:3030"

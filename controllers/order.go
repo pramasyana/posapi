@@ -12,6 +12,15 @@ type Order struct {
 	Base
 }
 
+func (b *Order) Mount(group fiber.Router) {
+	group.Post("", b.CreateOrder)
+	group.Post("/subtotal", b.GetSubTotal)
+	group.Get("", b.GetAllOrder)
+	group.Get("/:id", b.GetOrder)
+	group.Get("/:id/download", b.GetOrder)
+	group.Get("/:id/check-download", b.GetOrderStatus)
+}
+
 func (b *Order) GetAllOrder(c *fiber.Ctx) error {
 
 	orderList := models.FindAllOrders(c)
@@ -41,21 +50,21 @@ func (b *Order) GetAllOrder(c *fiber.Ctx) error {
 
 func (b *Order) GetSubTotal(c *fiber.Ctx) error {
 
-	data := new([]models.ReqDetailSubtotalOrder)
+	data := []models.ReqDetailSubtotalOrder{}
 
 	if len(c.Body()) == 0 {
 		return c.Status(400).JSON(fiber.Map{"success": false, "message": "body ValidationError: \"name\" is required"})
 	}
 
-	err := json.Unmarshal(c.Body(), &data)
+	json.Unmarshal(c.Body(), &data)
+	resOrderSubTotal := models.FindSubTotal(data)
 
-	if err != nil {
-		return c.Status(404).JSON(fiber.Map{
+	if len(resOrderSubTotal.SubProducts) == 0 {
+		return c.Status(400).JSON(fiber.Map{
 			"success": false,
-			"message": "Order Not Found",
+			"message": "Empty product",
 		})
 	}
-	resOrderSubTotal := models.FindSubTotal(*data)
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"success": true,
@@ -69,17 +78,10 @@ func (b *Order) GetOrder(c *fiber.Ctx) error {
 
 	var data = new([]models.ReqDetailSubtotalOrder)
 
-	if len(c.Body()) == 0 {
-		return c.Status(400).JSON(fiber.Map{"success": false, "message": "body ValidationError: \"name\" is required"})
-	}
-	err := json.Unmarshal(c.Body(), &data)
-	resOrderDetail, err := models.FindOrder(id, *data)
-	if err != nil {
-		return c.Status(404).JSON(fiber.Map{
-			"success": false,
-			"message": "Order Not Found",
-		})
-	}
+	json.Unmarshal(c.Body(), &data)
+
+	resOrderDetail, _ := models.FindOrder(id, *data)
+	resOrderDetail.DetailOrder.ReceiptId = "test"
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"success": true,
@@ -93,10 +95,7 @@ func (b *Order) GetOrderStatus(c *fiber.Ctx) error {
 
 	var data = new([]models.ReqDetailSubtotalOrder)
 
-	if len(c.Body()) == 0 {
-		return c.Status(400).JSON(fiber.Map{"success": false, "message": "body ValidationError: \"name\" is required"})
-	}
-	err := json.Unmarshal(c.Body(), &data)
+	json.Unmarshal(c.Body(), &data)
 	resOrderDetail, err := models.FindOrder(id, *data)
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{
@@ -108,7 +107,7 @@ func (b *Order) GetOrderStatus(c *fiber.Ctx) error {
 		IsDownload bool `json:"isDownload"`
 	}
 
-	isDownload.IsDownload = false
+	isDownload.IsDownload = true
 	if resOrderDetail.DetailOrder.OrderId != 0 {
 		isDownload.IsDownload = true
 	}
@@ -130,9 +129,9 @@ func (b *Order) CreateOrder(c *fiber.Ctx) error {
 	err := json.Unmarshal(c.Body(), &data)
 	if err != nil || len(data.Products) == 0 {
 		return c.Status(400).JSON(fiber.Map{
-			"status":  400,
+			"success": false,
 			"message": "Failed to create order",
-			"error":   err,
+			"error":   fiber.Map{},
 		})
 	}
 
@@ -140,9 +139,9 @@ func (b *Order) CreateOrder(c *fiber.Ctx) error {
 
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{
-			"status":  400,
-			"message": "Failed to create order",
-			"error":   err,
+			"success": false,
+			"message": "Failed to create order : " + err.Error(),
+			"error":   fiber.Map{},
 		})
 	}
 

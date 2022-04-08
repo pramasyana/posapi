@@ -24,7 +24,14 @@ func FindAllCashier(c *fiber.Ctx) []Cashiers {
 		db = db.Limit(c.Query("limit"))
 	}
 	if len(c.Query("skip")) > 0 {
-		db = db.Offset(c.Query("skip"))
+		limit, _ := strconv.Atoi(c.Query("limit"))
+		if limit == 0 {
+			limit = 10
+		}
+
+		skip, _ := strconv.Atoi(c.Query("skip"))
+		offset := skip * limit
+		db = db.Offset(offset)
 	}
 	db.Find(&cashiers)
 
