@@ -31,26 +31,6 @@ func (b *Product) GetAllProduct(c *fiber.Ctx) error {
 	}
 
 	count := models.GetProductCount(c)
-	if count == 0 && len(c.Query("categoryId")) == 0 && len(c.Query("q")) == 0 {
-		for i := 1; i <= 10; i++ {
-			data := new(models.Categories)
-			data.Name = "Kategori " + strconv.Itoa(i)
-			models.CreateCategory(*data)
-		}
-
-		for i := 1; i <= 5; i++ {
-			data := new(models.Products)
-			data.Name = "Produk " + strconv.Itoa(i)
-			data.Stock = int64(i * 7)
-			data.Price = float64(i * 78900)
-			data.Image = "https://images.tokopedia.net/img/cache/500-square/hDjmkQ/2020/11/26/001f1c6e-d068-484f-9333-c3fa4129ef26.jpg"
-			data.CategoryId = int64(i)
-			data.Discount = nil
-			models.CreateProduct(*data)
-		}
-	}
-
-	count = models.GetProductCount(c)
 	var products []models.ProductList = models.FindAllProduct(c)
 	if len(products) == 0 {
 		products = []models.ProductList{}
@@ -125,7 +105,7 @@ func (b *Product) CreateProduct(c *fiber.Ctx) error {
 	data.Stock = parsingData.Stock
 	data.Image = parsingData.Image
 	data.Sku = parsingData.Sku
-	data.CategoryId = parsingData.CategoryId
+	data.CategoriesId = parsingData.CategoryId
 
 	discount, err := json.Marshal(parsingData.Discount)
 	if err != nil {
@@ -183,7 +163,7 @@ func (b *Product) UpdateProduct(c *fiber.Ctx) error {
 	}
 
 	if p.CategoryId != 0 {
-		product.CategoryId = p.CategoryId
+		product.CategoriesId = p.CategoryId
 	}
 
 	if p.Name != "" {

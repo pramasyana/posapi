@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jinzhu/gorm"
@@ -21,7 +22,7 @@ type PaymentsList struct {
 	Name      string `json:"name"`
 	Type      string `json:"type"`
 	Logo      string `json:"logo"`
-	Card      []int  `json:"card"`
+	Card      []int  `json:"card,omitempty"`
 }
 
 func FindAllPayment(c *fiber.Ctx) []Payments {
@@ -29,13 +30,18 @@ func FindAllPayment(c *fiber.Ctx) []Payments {
 
 	db := GetDB()
 
+	limit := 10
 	if len(c.Query("limit")) > 0 {
-		db = db.Limit(c.Query("limit"))
+		limit, _ = strconv.Atoi(c.Query("limit"))
 	}
 
+	skip := 0
 	if len(c.Query("skip")) > 0 {
-		db = db.Offset(c.Query("skip"))
+		skip, _ = strconv.Atoi(c.Query("skip"))
 	}
+
+	db = db.Limit(limit)
+	db = db.Offset(skip)
 
 	db.Find(&payments)
 
@@ -63,16 +69,23 @@ func FindPayment(id int) (Payments, error) {
 
 func CreatePayment(payments Payments) (Payments, error) {
 	// Get Max cashierId
-	var maxCashier Payments
+	// var id int
+	// GetDB().Raw(`
+	// 	SELECT AUTO_INCREMENT as payment_id FROM information_schema.TABLES WHERE TABLE_SCHEMA = "` + config.Config("DB_NAME") + `" AND TABLE_NAME = "payments"
+	// 	`).Row().Scan(
+	// 	&id,
+	// )
+
+	var maxPayment Payments
 
 	GetDB().Raw(`
 		SELECT COALESCE(MAX(payment_id) + 1, 1) as payment_id
 		FROM payments
 		`).Scan(
-		&maxCashier,
+		&maxPayment,
 	)
 
-	payments.PaymentId = maxCashier.PaymentId
+	payments.PaymentId = maxPayment.PaymentId
 
 	err := GetDB().Create(&payments).Error
 	if err != nil {
@@ -80,4 +93,16 @@ func CreatePayment(payments Payments) (Payments, error) {
 	}
 
 	return payments, nil
+}
+
+func SavePayment(payment Payments) (Payments, error) {
+	err := GetDB().Table("payments").Where("payment_id = ?", payment.PaymentId).Update(payment).Error
+
+	return payment, err
+}
+
+func DeletePayment(id int) int64 {
+	count := GetDB().Where("payment_id = ?", id).Delete(&Payments{}).RowsAffected
+
+	return count
 }

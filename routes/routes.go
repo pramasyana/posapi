@@ -7,6 +7,10 @@ import (
 )
 
 func Register(router fiber.Router, database *gorm.DB) {
+	// router.Use(cache.New())
+
+	migration := new(controllers.Migration)
+	migration.Migrate()
 
 	cashier := new(controllers.Cashier)
 	routeCashier := router.Group("/cashiers")

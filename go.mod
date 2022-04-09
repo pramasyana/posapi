@@ -12,5 +12,7 @@ require (
 
 require (
 	github.com/lib/pq v1.10.4 // indirect
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	gorm.io/datatypes v1.0.6
+	gorm.io/gorm v1.23.2
 )

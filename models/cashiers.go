@@ -20,19 +20,18 @@ func FindAllCashier(c *fiber.Ctx) []Cashiers {
 	var cashiers []Cashiers
 
 	db := GetDB()
+	limit := 10
 	if len(c.Query("limit")) > 0 {
-		db = db.Limit(c.Query("limit"))
+		limit, _ = strconv.Atoi(c.Query("limit"))
 	}
-	if len(c.Query("skip")) > 0 {
-		limit, _ := strconv.Atoi(c.Query("limit"))
-		if limit == 0 {
-			limit = 10
-		}
 
-		skip, _ := strconv.Atoi(c.Query("skip"))
-		offset := skip * limit
-		db = db.Offset(offset)
+	skip := 0
+	if len(c.Query("skip")) > 0 {
+		skip, _ = strconv.Atoi(c.Query("skip"))
 	}
+
+	db = db.Limit(limit)
+	db = db.Offset(skip)
 	db.Find(&cashiers)
 
 	// rows, err := repository.database.Raw(`SELECT cashiers.cashier_id, cashiers.name FROM cashiers`).Rows()

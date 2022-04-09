@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jinzhu/gorm"
@@ -23,13 +24,18 @@ func FindAllCategory(c *fiber.Ctx) []Categories {
 
 	db := GetDB()
 
+	limit := 10
 	if len(c.Query("limit")) > 0 {
-		db = db.Limit(c.Query("limit"))
+		limit, _ = strconv.Atoi(c.Query("limit"))
 	}
 
+	skip := 0
 	if len(c.Query("skip")) > 0 {
-		db = db.Offset(c.Query("skip"))
+		skip, _ = strconv.Atoi(c.Query("skip"))
 	}
+
+	db = db.Limit(limit)
+	db = db.Offset(skip)
 
 	db.Find(&categories)
 

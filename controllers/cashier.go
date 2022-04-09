@@ -40,15 +40,6 @@ func (b *Cashier) Mount(group fiber.Router) {
 
 func (b *Cashier) GetAllCashier(c *fiber.Ctx) error {
 	count := models.GetCashierCount()
-	if count == 0 {
-		for i := 1; i <= 10; i++ {
-			data := new(models.Cashiers)
-			data.Name = "kasir " + strconv.Itoa(i)
-			models.CreateCashier(*data)
-		}
-	}
-
-	count = models.GetCashierCount()
 	var cashiers []models.Cashiers = models.FindAllCashier(c)
 	cashiersResponses := make([]CashierResponse, len(cashiers))
 	for i, element := range cashiers {

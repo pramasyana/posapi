@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jinzhu/gorm"
@@ -12,14 +13,14 @@ import (
 
 type Products struct {
 	gorm.Model
-	ProductId  int64          `gorm:"Not Null" json:"productid"`
-	Name       string         `json:"name"`
-	Stock      int64          `json:"stock"`
-	Price      float64        `json:"price"`
-	Image      string         `json:"image"`
-	Sku        string         `json:"SKU"`
-	CategoryId int64          `json:"categoryId"`
-	Discount   datatypes.JSON `json:"discount"`
+	ProductId    int64          `gorm:"Not Null" json:"productId"`
+	Name         string         `json:"name"`
+	Stock        int64          `json:"stock"`
+	Price        float64        `json:"price"`
+	Image        string         `json:"image"`
+	Sku          string         `json:"sku"`
+	CategoriesId int64          `json:"categoriesId"`
+	Discount     datatypes.JSON `json:"discount"`
 }
 
 type ProductsParsing struct {
@@ -27,7 +28,7 @@ type ProductsParsing struct {
 	Stock      int64       `json:"stock"`
 	Price      interface{} `json:"price"`
 	Image      string      `json:"image"`
-	Sku        string      `json:"SKU"`
+	Sku        string      `json:"sku"`
 	CategoryId int64       `json:"categoryId"`
 	Discount   interface{} `json:"discount"`
 }
@@ -48,26 +49,32 @@ func FindAllProduct(c *fiber.Ctx) []ProductList {
 	var product ProductList
 
 	db := GetDB().Table("products").Select(
-		"products.product_id, products.sku, products.name, products.stock, products.price, products.image, products.discount, products.category_id, categories.name as category_name")
+		"products.product_id, products.sku, products.name, products.stock, products.price, products.image, products.discount, products.categories_id, categories.name as category_name")
+	db = db.Joins("left join categories on products.categories_id=categories.category_id")
 	db = db.Where("products.deleted_at is NULL")
 
-	if len(c.Query("limit")) > 0 {
-		db = db.Limit(c.Query("limit"))
-	}
-
-	if len(c.Query("skip")) > 0 {
-		db = db.Offset(c.Query("skip"))
-	}
-
 	if len(c.Query("categoryId")) > 0 {
-		db = db.Where("products.category_id = ?", c.Query("categoryId"))
+		db = db.Where("products.categories_id = ?", c.Query("categoryId"))
 	}
 
 	if len(c.Query("q")) > 0 {
 		db = db.Where("products.name LIKE ?", `%`+c.Query("q")+`%`)
 	}
 
-	rows, _ := db.Joins("left join categories on products.category_id=categories.category_id").Rows()
+	limit := 10
+	if len(c.Query("limit")) > 0 {
+		limit, _ = strconv.Atoi(c.Query("limit"))
+	}
+
+	skip := 0
+	if len(c.Query("skip")) > 0 {
+		skip, _ = strconv.Atoi(c.Query("skip"))
+	}
+
+	db = db.Limit(limit)
+	db = db.Offset(skip)
+
+	rows, _ := db.Rows()
 	defer rows.Close()
 
 	for rows.Next() {
@@ -102,7 +109,7 @@ func GetProductCount(c *fiber.Ctx) int64 {
 	db := GetDB()
 
 	if len(c.Query("categoryId")) > 0 {
-		db = db.Where("category_id = ?", c.Query("categoryId"))
+		db = db.Where("categories_id = ?", c.Query("categoryId"))
 	}
 
 	if len(c.Query("q")) > 0 {
@@ -129,10 +136,10 @@ func FindProductCategory(id int) (ProductList, error) {
 	var product ProductList
 
 	db := GetDB().Table("products").Select(
-		"products.product_id, products.sku, products.name, products.stock, products.price, products.image, products.category_id, categories.name as category_name")
+		"products.product_id, products.sku, products.name, products.stock, products.price, products.image, products.categories_id, categories.name as category_name")
 	db = db.Where("products.deleted_at is NULL AND products.product_id = ?", id)
 
-	rows, err := db.Joins("left join categories on products.category_id=categories.category_id").Rows()
+	rows, err := db.Joins("left join categories on products.categories_id=categories.category_id").Rows()
 	if err != nil {
 		return product, err
 	}
@@ -162,7 +169,7 @@ func CreateProduct(product Products) (Products, error) {
 	var maxProduct Products
 	var category Categories
 
-	count := GetDB().Table("categories").Where("category_id = ?", product.CategoryId).Find(&category).RowsAffected
+	count := GetDB().Table("categories").Where("category_id = ?", product.CategoriesId).Find(&category).RowsAffected
 	if count == 0 {
 		return product, errors.New("category not found")
 	}
@@ -188,7 +195,7 @@ func CreateProduct(product Products) (Products, error) {
 func SaveProduct(product Products) error {
 	var category Categories
 
-	count := GetDB().Table("categories").Where("category_id = ?", product.CategoryId).Find(&category).RowsAffected
+	count := GetDB().Table("categories").Where("category_id = ?", product.CategoriesId).Find(&category).RowsAffected
 	if count == 0 {
 		return errors.New("category not found")
 	}
